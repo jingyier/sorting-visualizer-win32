@@ -1,0 +1,14 @@
+﻿#pragma once
+
+#define IDD_MAIN        100
+
+#define IDC_EDIT_N      1001
+#define IDC_EDIT_SEED   1002
+#define IDC_EDIT_RANGE  1003
+
+#define IDC_BTN_RUN     1004
+#define IDC_BTN_CLEAR   1005
+
+#define IDC_EDIT_OUT    1006
+
+
