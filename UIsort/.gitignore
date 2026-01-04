@@ -1,0 +1,21 @@
+# Visual Studio / C++ 中间文件和输出目录
+Debug/
+Release/
+x64/
+.vs/
+
+# VS 工程用户设置
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# 编译中间文件
+ipch/
+*.obj
+*.pch
+*.pdb
+*.ilk
+*.log
+*.tlog
+   *.idb

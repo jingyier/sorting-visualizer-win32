@@ -1,0 +1,23 @@
+#include "resource.h"
+#include <windows.h>
+
+IDD_MAIN DIALOGEX 0, 0, 340, 240
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "排序比较"
+FONT 9, "Segoe UI", 0, 0, 0x1
+BEGIN
+    LTEXT       "N (1-100)：",     -1,            10,  12,  60, 10
+    EDITTEXT    IDC_EDIT_N,                       80,  10,  60, 14, ES_NUMBER | WS_TABSTOP
+
+    LTEXT       "Seed：",          -1,            10,  32,  60, 10
+    EDITTEXT    IDC_EDIT_SEED,                    80,  30,  60, 14, ES_NUMBER | WS_TABSTOP
+
+    LTEXT       "Range：",         -1,            10,  52,  60, 10
+    EDITTEXT    IDC_EDIT_RANGE,                   80,  50,  60, 14, ES_NUMBER | WS_TABSTOP
+
+    PUSHBUTTON  "运行",            IDC_BTN_RUN,   160, 10,  60, 16, WS_TABSTOP
+    PUSHBUTTON  "清空",            IDC_BTN_CLEAR, 160, 30,  60, 16, WS_TABSTOP
+
+    LTEXT       "输出：",          -1,            10,  74,  60, 10
+    EDITTEXT    IDC_EDIT_OUT,                     10,  86, 320, 140, ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL
+END

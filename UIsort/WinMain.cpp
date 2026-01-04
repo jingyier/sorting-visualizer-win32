@@ -1,0 +1,271 @@
+#include <windows.h>
+#include <cstdio>
+#include <vector>
+#include "resource.h"
+
+#define MAXSIZE 100
+
+typedef struct { int comps; int moves; } Stats;
+static inline void swap_int(int* a, int* b, Stats* s) { int t = *a; s->moves++; *a = *b; s->moves++; *b = t; s->moves++; }
+static inline int less_than(int a, int b, Stats* s) { s->comps++; return a < b; }
+static inline int greater_than(int a, int b, Stats* s) { s->comps++; return a > b; }
+
+static void gen_random(std::vector<int>& a, int n, unsigned seed, int range) { a.resize(n); srand(seed); for (int i = 0; i < n; ++i)a[i] = rand() % (range > 0 ? range : 1); }
+static void copy_array(const std::vector<int>& src, std::vector<int>& dst) { dst = src; }
+
+static void bubble_sort(std::vector<int>& a, Stats* s) { s->comps = s->moves = 0; int n = (int)a.size(); for (int i = 0; i < n - 1; ++i) { int swapped = 0; for (int j = 0; j < n - 1 - i; ++j) { if (greater_than(a[j], a[j + 1], s)) { swap_int(&a[j], &a[j + 1], s); swapped = 1; } } if (!swapped)break; } }
+static void insertion_sort(std::vector<int>& a, Stats* s) { s->comps = s->moves = 0; int n = (int)a.size(); for (int i = 1; i < n; ++i) { int key = a[i]; s->moves++; int j = i - 1; while (j >= 0 && greater_than(a[j], key, s)) { a[j + 1] = a[j]; s->moves++; --j; } a[j + 1] = key; s->moves++; } }
+static void selection_sort(std::vector<int>& a, Stats* s) { s->comps = s->moves = 0; int n = (int)a.size(); for (int i = 0; i < n - 1; ++i) { int minIdx = i; for (int j = i + 1; j < n; ++j) if (less_than(a[j], a[minIdx], s)) minIdx = j; if (minIdx != i) swap_int(&a[i], &a[minIdx], s); } }
+static void quick_sort_rec(std::vector<int>& a, int l, int r, Stats* s) { if (l >= r)return; int pivot = a[l]; s->moves++; int lt = l, i = l + 1, gt = r; while (i <= gt) { if (less_than(a[i], pivot, s)) { swap_int(&a[i], &a[lt], s); ++lt; ++i; } else if (less_than(pivot, a[i], s)) { swap_int(&a[i], &a[gt], s); --gt; } else { ++i; } } quick_sort_rec(a, l, lt - 1, s); quick_sort_rec(a, gt + 1, r, s); }
+static void quick_sort(std::vector<int>& a, Stats* s) { s->comps = s->moves = 0; if (!a.empty()) quick_sort_rec(a, 0, (int)a.size() - 1, s); }
+static void shell_sort(std::vector<int>& a, Stats* s) { s->comps = s->moves = 0; int n = (int)a.size(); for (int gap = n / 2; gap > 0; gap /= 2) { for (int i = gap; i < n; ++i) { int key = a[i]; s->moves++; int j = i - gap; while (j >= 0 && greater_than(a[j], key, s)) { a[j + gap] = a[j]; s->moves++; j -= gap; } a[j + gap] = key; s->moves++; } } }
+static void heapify_down(std::vector<int>& a, int n, int i, Stats* s) { while (true) { int largest = i, l = i * 2 + 1, r = i * 2 + 2; if (l < n && less_than(a[largest], a[l], s)) largest = l; if (r < n&& less_than(a[largest], a[r], s)) largest = r; if (largest == i) break; swap_int(&a[i], &a[largest], s); i = largest; } }
+static void heap_sort(std::vector<int>& a, Stats* s) { s->comps = s->moves = 0; int n = (int)a.size(); for (int i = n / 2 - 1; i >= 0; --i) heapify_down(a, n, i, s); for (int end = n - 1; end > 0; --end) { swap_int(&a[0], &a[end], s); heapify_down(a, end, 0, s); } }
+
+static void AppendText(HWND hDlg, int editId, const wchar_t* text) { HWND hEdit = GetDlgItem(hDlg, editId); int len = GetWindowTextLengthW(hEdit); SendMessageW(hEdit, EM_SETSEL, (WPARAM)len, (LPARAM)len); SendMessageW(hEdit, EM_REPLACESEL, FALSE, (LPARAM)text); }
+
+static void PrintLine(HWND hDlg, const wchar_t* text)
+{
+    AppendText(hDlg, IDC_EDIT_OUT, text);
+    AppendText(hDlg, IDC_EDIT_OUT, L"\r\n");
+}
+
+// 最近一次运行的统计数据，用于画折线图
+static Stats g_sb, g_si, g_ss, g_sq, g_sh, g_shp;
+static BOOL  g_hasStats = FALSE;
+
+static void OnRun(HWND hDlg) {
+    BOOL okN = FALSE, okSeed = FALSE, okRange = FALSE;
+    UINT n = GetDlgItemInt(hDlg, IDC_EDIT_N, &okN, FALSE);
+    UINT seed = GetDlgItemInt(hDlg, IDC_EDIT_SEED, &okSeed, FALSE);
+    UINT range = GetDlgItemInt(hDlg, IDC_EDIT_RANGE, &okRange, FALSE);
+    if (!okN || !okSeed || !okRange || n == 0 || n > MAXSIZE) { MessageBoxW(hDlg, L"请输入合法的 N/Seed/Range（N在1~100）。", L"提示", MB_ICONWARNING); return; }
+
+    std::vector<int> base; gen_random(base, (int)n, seed, (int)range);
+    std::vector<int> a; Stats sb{}, si{}, ss{}, sq{}, sh{}, shp{};
+    wchar_t buf[256];
+
+    copy_array(base, a); bubble_sort(a, &sb);
+    copy_array(base, a); insertion_sort(a, &si);
+    copy_array(base, a); selection_sort(a, &ss);
+    copy_array(base, a); quick_sort(a, &sq);
+    copy_array(base, a); shell_sort(a, &sh);
+    copy_array(base, a); heap_sort(a, &shp);
+
+    // 保存到全局，供折线图使用
+    g_sb = sb; g_si = si; g_ss = ss; g_sq = sq; g_sh = sh; g_shp = shp;
+    g_hasStats = TRUE;
+
+    // 清晰分块输出
+    PrintLine(hDlg, L"=== 实验参数 ===");
+    swprintf(buf, 256, L"n = %u, seed = %u, range = %u", n, seed, range); PrintLine(hDlg, buf);
+    PrintLine(hDlg, L"");
+
+    // 说明算法缩写
+    PrintLine(hDlg, L"算法缩写: B=冒泡, I=插入, S=选择, Q=快速, H=希尔, HP=堆");
+    PrintLine(hDlg, L"");
+
+    // 实测表格（使用 ASCII 缩写，保证等宽字体对齐）
+    PrintLine(hDlg, L"=== 实测统计（当前随机数据） ===");
+    PrintLine(hDlg, L"Alg |   comps(比较)   |   moves(移动)");
+    PrintLine(hDlg, L"---------------------------------------");
+
+    swprintf(buf, 256, L"%-3S | %13d | %13d", "B",  sb.comps,  sb.moves);  PrintLine(hDlg, buf);
+    swprintf(buf, 256, L"%-3S | %13d | %13d", "I",  si.comps,  si.moves);  PrintLine(hDlg, buf);
+    swprintf(buf, 256, L"%-3S | %13d | %13d", "S",  ss.comps,  ss.moves);  PrintLine(hDlg, buf);
+    swprintf(buf, 256, L"%-3S | %13d | %13d", "Q",  sq.comps,  sq.moves);  PrintLine(hDlg, buf);
+    swprintf(buf, 256, L"%-3S | %13d | %13d", "H",  sh.comps,  sh.moves);  PrintLine(hDlg, buf);
+    swprintf(buf, 256, L"%-3S | %13d | %13d", "HP", shp.comps, shp.moves); PrintLine(hDlg, buf);
+
+    PrintLine(hDlg, L"");
+
+    // 理论复杂度表格（汉语化说明）
+    PrintLine(hDlg, L"=== 理论复杂度（用 n 表示，粗略） ===");
+    PrintLine(hDlg, L"Alg | 时间复杂度              | 比较 / 移动 次数近似公式");
+    PrintLine(hDlg, L"--------------------------------------------------------------------------");
+    PrintLine(hDlg, L"B   | O(n^2)                  | 比较约为 n(n-1)/2，元素移动次数数量级为 n^2");
+    PrintLine(hDlg, L"I   | O(n^2)                  | 平均比较/移动次数数量级为 n^2，最好情况为 n");
+    PrintLine(hDlg, L"S   | O(n^2)                  | 比较固定约为 n(n-1)/2，交换次数不超过 3(n-1)");
+    PrintLine(hDlg, L"Q   | O(nlogn),最坏 O(n^2)    | 平均比较/移动次数为 nlogn 数量级, 最坏退化到 n^2");
+    PrintLine(hDlg, L"H   | 约 O(n^{1.5})~O(n^2)    | 具体次数依赖增量序列, 一般介于 nlogn 和 n^2 之间");
+    PrintLine(hDlg, L"HP  | O(nlogn)                | 建堆+多次下滤, 总体比较/移动次数为 nlogn 数量级");
+}
+
+// 折线图窗口过程：简单画两条折线（比较次数和移动次数）
+static LRESULT CALLBACK ChartWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+    case WM_PAINT:
+    {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+
+        RECT rc;
+        GetClientRect(hWnd, &rc);
+
+        const int left = 60;
+        const int right = rc.right - 20;
+        const int top = 20;
+        const int bottom = rc.bottom - 40;
+
+        // 画坐标轴
+        MoveToEx(hdc, left, top, NULL);
+        LineTo(hdc, left, bottom);
+        LineTo(hdc, right, bottom);
+
+        if (g_hasStats)
+        {
+            // 6 个点，对应 B,I,S,Q,H,HP
+            int comps[6] = { g_sb.comps, g_si.comps, g_ss.comps, g_sq.comps, g_sh.comps, g_shp.comps };
+            int moves[6] = { g_sb.moves, g_si.moves, g_ss.moves, g_sq.moves, g_sh.moves, g_shp.moves };
+
+            int maxVal = 0;
+            for (int i = 0; i < 6; ++i)
+            {
+                if (comps[i] > maxVal) maxVal = comps[i];
+                if (moves[i] > maxVal) maxVal = moves[i];
+            }
+            if (maxVal <= 0) maxVal = 1;
+
+            int width = right - left;
+            int height = bottom - top;
+
+            int stepX = width / 5; // 6 个点，5 段
+
+            // 画比较次数折线（蓝色）
+            HPEN hPenBlue = CreatePen(PS_SOLID, 2, RGB(0, 0, 255));
+            HPEN hOldPen = (HPEN)SelectObject(hdc, hPenBlue);
+            for (int i = 0; i < 6; ++i)
+            {
+                int x = left + i * stepX;
+                int y = bottom - (int)(height * (double)comps[i] / maxVal);
+                if (i == 0) MoveToEx(hdc, x, y, NULL);
+                else LineTo(hdc, x, y);
+            }
+            SelectObject(hdc, hOldPen);
+            DeleteObject(hPenBlue);
+
+            // 画移动次数折线（红色）
+            HPEN hPenRed = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
+            hOldPen = (HPEN)SelectObject(hdc, hPenRed);
+            for (int i = 0; i < 6; ++i)
+            {
+                int x = left + i * stepX;
+                int y = bottom - (int)(height * (double)moves[i] / maxVal);
+                if (i == 0) MoveToEx(hdc, x, y, NULL);
+                else LineTo(hdc, x, y);
+            }
+            SelectObject(hdc, hOldPen);
+            DeleteObject(hPenRed);
+
+            // X 轴标签
+            const wchar_t* labels[6] = { L"B", L"I", L"S", L"Q", L"H", L"HP" };
+            for (int i = 0; i < 6; ++i)
+            {
+                int x = left + i * stepX;
+                TextOutW(hdc, x - 10, bottom + 5, labels[i], lstrlenW(labels[i]));
+            }
+
+            // 图例
+            TextOutW(hdc, left, top - 15, L"蓝: 比较次数  红: 移动次数", 15);
+        }
+        else
+        {
+            TextOutW(hdc, 80, 80, L"请先在主界面点击运行获取数据", 17);
+        }
+
+        EndPaint(hWnd, &ps);
+        return 0;
+    }
+    case WM_DESTROY:
+        return 0;
+    }
+    return DefWindowProcW(hWnd, msg, wParam, lParam);
+}
+
+static void ShowChartWindow(HINSTANCE hInst, HWND hParent)
+{
+    const wchar_t* clsName = L"SortChartWindow";
+
+    static bool s_registered = false;
+    if (!s_registered)
+    {
+        WNDCLASSW wc = {};
+        wc.lpfnWndProc = ChartWndProc;
+        wc.hInstance = hInst;
+        wc.lpszClassName = clsName;
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+        RegisterClassW(&wc);
+        s_registered = true;
+    }
+
+    HWND hWnd = CreateWindowW(clsName, L"排序算法比较 - 折线图", WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 600, 400, hParent, NULL, hInst, NULL);
+    if (hWnd)
+    {
+        ShowWindow(hWnd, SW_SHOW);
+        UpdateWindow(hWnd);
+    }
+}
+
+static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_INITDIALOG:
+        SetDlgItemInt(hDlg, IDC_EDIT_N, 50, FALSE);
+        SetDlgItemInt(hDlg, IDC_EDIT_SEED, 12345, FALSE);
+        SetDlgItemInt(hDlg, IDC_EDIT_RANGE, 1000, FALSE);
+
+        // 使用更好看的等宽字体 Consolas，如果获取失败则退回默认等宽字体
+        {
+            LOGFONTW lf = {};
+            lf.lfHeight = -14; // 字号稍大一点
+            wcscpy_s(lf.lfFaceName, L"Consolas");
+            HFONT hFont = CreateFontIndirectW(&lf);
+            if (!hFont)
+            {
+                hFont = (HFONT)GetStockObject(ANSI_FIXED_FONT);
+            }
+            if (hFont)
+            {
+                SendMessage(GetDlgItem(hDlg, IDC_EDIT_OUT), WM_SETFONT, (WPARAM)hFont, TRUE);
+            }
+        }
+
+        return TRUE;
+    case WM_COMMAND:
+        switch (LOWORD(wParam)) {
+        case IDC_BTN_RUN:   OnRun(hDlg); return TRUE;
+        case IDC_BTN_CLEAR: SetDlgItemTextW(hDlg, IDC_EDIT_OUT, L""); return TRUE;
+        case IDC_BTN_CHART:
+        {
+            if (!g_hasStats)
+            {
+                MessageBoxW(hDlg, L"请先点击运行，生成一次统计数据后再查看折线图。", L"提示", MB_ICONINFORMATION);
+            }
+            else
+            {
+                ShowChartWindow((HINSTANCE)GetModuleHandle(NULL), hDlg);
+            }
+            return TRUE;
+        }
+        case IDCANCEL:
+        case IDOK: EndDialog(hDlg, 0); return TRUE;
+        }
+        break;
+    case WM_CLOSE: EndDialog(hDlg, 0); return TRUE;
+    }
+    return FALSE;
+}
+
+int APIENTRY wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int) {
+    INT_PTR ret = DialogBoxParamW(hInst, MAKEINTRESOURCEW(IDD_MAIN), NULL, DlgProc, 0);
+    if (ret == -1) {
+        DWORD err = GetLastError();
+        wchar_t buf[128];
+        swprintf(buf, 128, L"DialogBoxParamW 失败，错误码 = %lu", err);
+        MessageBoxW(NULL, buf, L"错误", MB_ICONERROR);
+    }
+    return (int)ret;
+}
